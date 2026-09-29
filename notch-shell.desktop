@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Notch Shell
+GenericName=Notch Shell
+Comment=Feature rich dynamic pill bar for Hyprland
+Icon=/usr/share/notch-shell/share/logo.png
+# /usr/bin because that is where the pacman package installs the launcher.
+# install.sh uses /usr/local/bin for manual installs, which this entry
+# deliberately does not target.
+Exec=/usr/bin/notch-shell
+Terminal=false
+Categories=System;Utility;

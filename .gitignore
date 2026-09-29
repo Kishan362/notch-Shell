@@ -1,0 +1,7 @@
+.builds_hash
+result/
+build/
+pkg/
+src/
+*.pkg.tar.zst
+result

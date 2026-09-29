@@ -1,0 +1,338 @@
+import QtQuick
+import QtQuick.Layouts
+import IslandBackend
+
+RowLayout {
+  id: root
+
+  readonly property real dpi: Config.dpiScale
+
+  property real buttonWidth
+  property real buttonHeight
+  property real buttonRadius
+  property color buttonBgOff
+  property color buttonFgOff
+
+  property bool notificationPopup: false
+  property bool controlCenterOpen: false
+  property bool mediaAutoOpened: false
+  property bool wifiPanelOpened: false
+  property bool btPanelOpened: false
+  property bool hasPlayer: false
+  property real playerHeight: 0
+
+  anchors.top: parent.top
+  anchors.topMargin: hasPlayer ? playerHeight + 77 : 5
+  anchors.left: parent.left
+  anchors.right: parent.right
+  anchors.leftMargin: 3 * dpi
+  anchors.rightMargin: 5 * dpi
+
+  onControlCenterOpenChanged: {
+    if (!controlCenterOpen) root.wifiPanelOpened = false; root.btPanelOpened = false
+  }
+
+  // wifi
+  Rectangle {
+    id: wifiBtn
+    implicitWidth: root.buttonWidth
+    implicitHeight: root.buttonHeight
+    radius: root.buttonRadius
+    visible: root.controlCenterOpen && !root.mediaAutoOpened
+    color: WifiController.enabled
+            ? (wifiHover.hovered ? Qt.lighter(Theme.bg1, 1.2) : Theme.bg1)
+            : (wifiHover.hovered ? Qt.lighter(root.buttonBgOff, 1.3) : root.buttonBgOff)
+    scale: wifiMouse.pressed ? 0.93 : 1.0
+    Behavior on color { ColorAnimation { duration: 150 } }
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
+
+    MarqueeText {
+        anchors.centerIn: parent
+        spacing: 5 * root.dpi
+        icon: "\uf1eb"
+        iconColor: WifiController.enabled ? Theme.infoFg : root.buttonFgOff
+        iconFontFamily: Theme.nerdFontFamily
+        iconPixelSize: 12
+
+        text: !WifiController.enabled ? "Off"
+            : WifiController.currentSsid.length > 0 ? WifiController.currentSsid
+            : (WifiController.statusText.length > 0 ? WifiController.statusText : "Not connected")
+        color: WifiController.enabled ? Theme.fg : root.buttonFgOff
+        font { family: Theme.fontFamily; pixelSize: 10; weight: 500 }
+        maxWidth: 50
+    }
+
+    HoverHandler { id: wifiHover }
+    MouseArea {
+      id: wifiMouse
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton | Qt.RightButton
+      cursorShape: Qt.PointingHandCursor
+      onClicked: (mouse) => {
+        if (mouse.button === Qt.RightButton) {
+          root.wifiPanelOpened = !root.wifiPanelOpened
+          if (root.wifiPanelOpened && WifiController.enabled) WifiController.refreshNetworks(true)
+          return
+        }
+        WifiController.setEnabled(!WifiController.enabled)
+      }
+    }
+  }
+
+  WifiPanel {
+    visible: root.wifiPanelOpened
+    anchorX: root.mapToGlobal(root.width, 0).x - (600 * root.dpi) - (30 * root.dpi)
+    anchorY: wifiBtn.mapToGlobal(0, 0).y
+  }
+
+  onNotificationPopupChanged: {
+    if (root.notificationPopup) root.wifiPanelOpened = false; root.btPanelOpened = false
+  }
+
+  // silent notifications
+  Rectangle {
+    id: dndBtn
+    implicitWidth: root.buttonWidth
+    implicitHeight: root.buttonHeight
+    radius: root.buttonRadius
+    visible: root.controlCenterOpen && !root.mediaAutoOpened
+    color: notificationModule.dndEnabled
+    ? (dndHover.hovered ? Qt.lighter(Theme.bg2, 1.2) : Theme.bg2)
+    : (dndHover.hovered ? Qt.lighter(root.buttonBgOff, 1.3) : root.buttonBgOff)
+    scale: dndMouse.pressed ? 0.93 : 1.0
+    Behavior on color { ColorAnimation { duration: 150 } }
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
+
+    Text {
+      text: String.fromCodePoint(0xf1f6)
+      color: notificationModule.dndEnabled ? Theme.fg : root.buttonFgOff
+      anchors.centerIn: parent
+      font { family: Theme.nerdFontFamily; pixelSize: 13 }
+    }
+    HoverHandler { id: dndHover }
+    MouseArea {
+      id: dndMouse
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: notificationModule.dndEnabled = !notificationModule.dndEnabled
+    }
+  }
+
+  // timer / countdown
+  Rectangle {
+    id: timerBtn
+    implicitWidth: root.buttonWidth
+    implicitHeight: root.buttonHeight
+    radius: root.buttonRadius
+    color: countdownModule.running
+           ? (timerHover.hovered ? Qt.lighter(Theme.bg1, 1.2) : Theme.bg1)
+           : (timerHover.hovered ? Qt.lighter(root.buttonBgOff, 1.3) : root.buttonBgOff)
+    scale: timerMouse.pressed ? 0.93 : 1.0
+    Behavior on color { ColorAnimation { duration: 150 } }
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
+    property int selectedMinutes: 1
+    property bool burstTriggered: false
+    property bool bursting: false
+    readonly property var burstPalette: ["#ffd43b", "#ff6b6b", "#4490ee", "#b197fc", "#f783ac", "#63e6be"]
+
+    // hold to burst the running timer with a small explosion
+    function burst() {
+      if (!countdownModule.running && countdownModule.remainingSeconds <= 0) return
+      burstTriggered = true
+      bursting = true
+      burstEndTimer.start()
+      countdownModule.reset()
+      burstFlashAnim.restart()
+      timerRowPop.restart()
+      for (var i = 0; i < burstParticles.count; ++i) burstParticles.itemAt(i).burst()
+    }
+
+    Timer {
+      id: burstHoldTimer
+      interval: 500
+      repeat: false
+      onTriggered: timerBtn.burst()
+    }
+
+    Timer {
+      id: burstEndTimer
+      interval: 560
+      repeat: false
+      onTriggered: timerBtn.bursting = false
+    }
+
+    RowLayout {
+      id: timerRow
+      anchors.centerIn: parent
+      spacing: 5 * root.dpi
+      transformOrigin: Item.Center
+      Text {
+        text: {
+          if (countdownModule.running) return String.fromCodePoint(0xf1ade)
+          if (countdownModule.remainingSeconds > 0) return String.fromCodePoint(0xf1ae0)
+          return String.fromCodePoint(0xf13ab)
+        }
+        color: timerBtn.bursting ? Theme.warnFg : (countdownModule.running ? Theme.infoFg : root.buttonFgOff)
+        font { family: Theme.nerdFontFamily; pixelSize: 14 }
+      }
+      Text {
+        text: countdownModule.running || countdownModule.remainingSeconds > 0
+            ? countdownModule.formatted() : timerBtn.selectedMinutes + "m"
+        color: timerBtn.bursting ? Theme.warnFg : (countdownModule.running ? Theme.fg : root.buttonFgOff)
+        font { family: Theme.fontFamily; pixelSize: 10; weight: 400 }
+      }
+    }
+
+    // quick orange flash on the button face
+    Rectangle {
+      id: burstFlash
+      anchors.fill: parent
+      radius: root.buttonRadius
+      color: Theme.warnFg
+      visible: false
+      opacity: 0
+    }
+
+    SequentialAnimation {
+      id: burstFlashAnim
+      running: false
+      onStarted: burstFlash.visible = true
+      NumberAnimation { target: burstFlash; property: "opacity"; from: 0.85; to: 0; duration: 400; easing.type: Easing.OutQuad }
+      ScriptAction { script: burstFlash.visible = false }
+    }
+
+    // the timer glyph pops and vanishes
+    SequentialAnimation {
+      id: timerRowPop
+      running: false
+      ParallelAnimation {
+        NumberAnimation { target: timerRow; property: "scale"; to: 1.8; duration: 200; easing.type: Easing.OutQuad }
+        NumberAnimation { target: timerRow; property: "opacity"; to: 0; duration: 240; easing.type: Easing.OutQuad }
+      }
+      ScriptAction { script: { timerRow.scale = 1; timerRow.opacity = 1 } }
+    }
+
+    // debris flying out from the center
+    Repeater {
+      id: burstParticles
+      anchors.centerIn: parent
+      model: 10
+      delegate: Rectangle {
+        id: p
+        property real tx: 0
+        property real ty: 0
+        width: (3 + Math.random() * 4) * root.dpi
+        height: width
+        radius: width / 2
+        color: timerBtn.burstPalette[index % timerBtn.burstPalette.length]
+        x: -width / 2
+        y: -height / 2
+        visible: false
+        opacity: 0
+        function burst() {
+          var d = (22 + Math.random() * 48) * root.dpi
+          var a = Math.random() * 2 * Math.PI
+          tx = Math.cos(a) * d
+          ty = Math.sin(a) * d
+          visible = true
+          fly.restart()
+        }
+        SequentialAnimation {
+          id: fly
+          running: false
+          ParallelAnimation {
+            NumberAnimation { target: p; property: "x"; from: -p.width / 2; to: p.tx; duration: 500; easing.type: Easing.OutCubic }
+            NumberAnimation { target: p; property: "y"; from: -p.height / 2; to: p.ty; duration: 500; easing.type: Easing.OutCubic }
+            NumberAnimation { target: p; property: "opacity"; from: 1; to: 0; duration: 500; easing.type: Easing.OutCubic }
+          }
+        }
+      }
+    }
+
+    HoverHandler { id: timerHover }
+    MouseArea {
+      id: timerMouse
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+      cursorShape: Qt.PointingHandCursor
+      onPressed: (mouse) => {
+        if (mouse.button !== Qt.LeftButton) return
+        timerBtn.burstTriggered = false
+        if (countdownModule.running || countdownModule.remainingSeconds > 0) {
+          burstHoldTimer.start()
+        }
+      }
+      onReleased: (mouse) => {
+        if (mouse.button !== Qt.LeftButton) return
+        burstHoldTimer.stop()
+      }
+      onClicked: (mouse) => {
+        if (mouse.button === Qt.LeftButton && timerBtn.burstTriggered) return
+        if (mouse.button === Qt.MiddleButton) { countdownModule.reset(); return }
+        if (mouse.button === Qt.RightButton) {
+          if (countdownModule.running || countdownModule.remainingSeconds > 0) return
+          const presets = Config.timerPresets
+          const idx = presets.indexOf(timerBtn.selectedMinutes)
+          timerBtn.selectedMinutes = presets[(idx + 1) % presets.length]
+          return
+        }
+        if (countdownModule.running) { countdownModule.pause(); return }
+        if (countdownModule.remainingSeconds > 0) { countdownModule.resume(); return }
+        countdownModule.start(timerBtn.selectedMinutes)
+      }
+    }
+  }
+
+  // bluetooth
+  Rectangle {
+    id: btBtn
+    implicitWidth: root.buttonWidth
+    implicitHeight: root.buttonHeight
+    radius: root.buttonRadius
+    visible: root.controlCenterOpen && !root.mediaAutoOpened
+    color: BluetoothController.enabled
+            ? (btHover.hovered ? Qt.lighter(Theme.bg1, 1.2) : Theme.bg1)
+            : (btHover.hovered ? Qt.lighter(root.buttonBgOff, 1.3) : root.buttonBgOff)
+    scale: btMouse.pressed ? 0.93 : 1.0
+    Behavior on color { ColorAnimation { duration: 150 } }
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
+    RowLayout {
+      anchors.centerIn: parent
+      spacing: 5 * root.dpi
+      Text {
+        text: "\uf294"
+        color: BluetoothController.enabled ? Theme.infoFg : root.buttonFgOff
+        font { family: Theme.nerdFontFamily; pixelSize: 15 }
+      }
+      MarqueeText {
+        text: !BluetoothController.enabled ? "Off"
+            : BluetoothController.currentDeviceName.length > 0 ? BluetoothController.currentDeviceName
+            : (BluetoothController.statusText.length > 0 ? BluetoothController.statusText : "Not connected")
+        color: BluetoothController.enabled ? Theme.fg : root.buttonFgOff
+        font { family: Theme.fontFamily; pixelSize: 10; weight: 400 }
+        maxWidth: 50
+      }
+    }
+    HoverHandler { id: btHover }
+    MouseArea {
+      id: btMouse
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton | Qt.RightButton
+      cursorShape: Qt.PointingHandCursor
+      onClicked: (mouse) => {
+        if (mouse.button === Qt.RightButton) {
+          root.btPanelOpened = !root.btPanelOpened
+          if (root.btPanelOpened && BluetoothController.enabled) BluetoothController.refreshDevices(true)
+          return
+        }
+        BluetoothController.setEnabled(!BluetoothController.enabled)
+      }
+    }
+  }
+
+  BluetoothPanel {
+    visible: root.btPanelOpened
+    anchorX: root.mapToGlobal(root.width, 0).x + (29 * root.dpi)
+    anchorY: btBtn.mapToGlobal(0, 0).y
+  }
+}
