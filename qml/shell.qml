@@ -1004,27 +1004,37 @@ ShellRoot {
 
         RowLayout {
          // profile picture (display picture)
-           ClippingRectangle {
-            id: avatarClip
+          // The ClippingRectangle and the hit area are siblings rather than
+          // parent and child on purpose: ClippingRectangle renders its
+          // children through a ShaderEffectSource, so a MouseArea inside it
+          // sits in an offscreen subtree and never receives a real click. The
+          // picker simply did nothing.
+          Item {
+            id: avatarHolder
             width: avatarSize
             height: avatarSize
-            radius: avatarSize / 2
-            property string imgPath: Config.displayPicture ? "file://" + Config.displayPicture.replace("~", Quickshell.env("HOME")) : ""
-            color: (imgPath === "" || avatarImg.status !== Image.Ready) ? Theme.bg5 : "transparent"
-            layer.enabled: true
-            layer.smooth: true
-            layer.mipmap: true
-            layer.textureSize: Qt.size(avatarSize, avatarSize)
 
-            Image {
-              id: avatarImg
+            ClippingRectangle {
+              id: avatarClip
               anchors.fill: parent
-              source: avatarClip.imgPath
-              fillMode: Image.PreserveAspectCrop
-              asynchronous: false
-              smooth: true
-              mipmap: true
-              sourceSize: Qt.size(avatarSize, avatarSize)
+              radius: avatarSize / 2
+              property string imgPath: Config.displayPicture ? "file://" + Config.displayPicture.replace("~", Quickshell.env("HOME")) : ""
+              color: (imgPath === "" || avatarImg.status !== Image.Ready) ? Theme.bg5 : "transparent"
+              layer.enabled: true
+              layer.smooth: true
+              layer.mipmap: true
+              layer.textureSize: Qt.size(avatarSize, avatarSize)
+
+              Image {
+                id: avatarImg
+                anchors.fill: parent
+                source: avatarClip.imgPath
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: false
+                smooth: true
+                mipmap: true
+                sourceSize: Qt.size(avatarSize, avatarSize)
+              }
             }
 
             // click to choose a different picture
@@ -1047,6 +1057,7 @@ ShellRoot {
               Behavior on opacity { NumberAnimation { duration: 120 } }
             }
           }
+
 
           // username
           Process {
