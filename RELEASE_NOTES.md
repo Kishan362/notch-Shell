@@ -1,3 +1,34 @@
+# notch-shell 0.1.1
+
+Two fixes to the profile picture picker introduced in 0.1.0. Everything else in
+0.1.0 is unchanged.
+
+## The picker never opened
+
+Clicking the avatar did nothing, and nothing was logged to explain it. The
+`MouseArea` was a child of the avatar's `ClippingRectangle`, and that type
+renders its children through a `ShaderEffectSource`. The hit area therefore sat
+in an offscreen subtree and never received a pointer event, so the click fell
+through to the dashboard's own toggle and the file dialog was never asked to
+open. The `ClippingRectangle` and the hit area are now siblings inside a plain
+`Item`, which puts the `MouseArea` back in the scene graph.
+
+## A new picture needed a restart
+
+Even once the dialog opened, the new picture only appeared after restarting the
+shell. `set_config.py` wrote the config through a temp file and `os.replace()`,
+which swaps the inode. `Config.qml` watches the config path with a `FileView`,
+and that is an inotify watch on the inode behind the path, so the first rename
+moved the watch onto a file that no longer existed. The first change reached
+the shell and every later one was silently dropped.
+
+The write is now done in place, so the inode and the watch both survive. Since
+that gives up atomicity, the new text is fully computed before anything is
+written, the previous contents are copied to `config.jsonc.bak` first, and the
+original is restored if the write does not get far.
+
+---
+
 # notch-shell 0.1.0
 
 First release of **notch-shell**, a Hyprland shell built with
