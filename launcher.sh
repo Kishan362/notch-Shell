@@ -27,6 +27,13 @@ if [ -z "${XCOMPOSE:-}" ]; then
   fi
 fi
 
+# Qt needs the xdg-desktop-portal platform theme for its file dialog to appear
+# at all. Without this the dialog opens invisibly: the mini dashboard's
+# "choose a profile picture" button would do nothing on Hyprland.
+if [[ -z "${QT_QPA_PLATFORMTHEME:-}" ]] && [[ -f /usr/lib/qt6/plugins/platformthemes/libqxdgdesktopportal.so ]]; then
+  export QT_QPA_PLATFORMTHEME=xdgdesktopportal
+fi
+
 export LD_LIBRARY_PATH="$HOME/.config/quickshell/notch-shell/IslandBackend:$LD_LIBRARY_PATH"
 export QML_IMPORT_PATH="/usr/share/notch-shell:$QML_IMPORT_PATH"
 exec qs -p /usr/share/notch-shell

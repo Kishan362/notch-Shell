@@ -69,6 +69,43 @@ lints against any new hardcoded colour, and asserts that the decorative hues
 (weather icons, power-menu accents) still clear 3:1 against the lightest and
 darkest bar. All 38 pass.
 
+### CPU stats in the mini dashboard
+
+The right side of the mini dashboard, where the data-usage readout used to be,
+now shows CPU utilisation and package temperature. Click or right click the
+readout for a per-core breakdown, one bar each; a bar turns red past 85%.
+
+Usage is read from `/proc/stat` through a `FileView`, so a refresh costs one
+small read rather than a process spawn, and the percentages are deltas between
+samples rather than ratios of counters-since-boot, which would only report
+uptime. Temperature comes from `lm_sensors` and hides itself when that is not
+installed rather than showing a dash.
+
+The per-core list is capped to whatever height the dashboard actually has, with
+the overflow counted as `+N more`; on a 16-core machine the dashboard has room
+for about four rows. The module also sits clear of the battery readout, which
+occupies the top right.
+
+**nusgmon is no longer a dependency.** It existed only to feed the data-usage
+display this replaces.
+
+### Click-to-pick profile picture
+
+Click the avatar in the mini dashboard to choose an image. It is downscaled to
+256x256, EXIF rotation applied and centre cropped so the circular avatar never
+letterboxes, then cached under `~/.cache/notch-shell/`. `displayPicture` is
+repointed at the cached copy by `scripts/set_config.py`, which edits that one
+key in place, so comments and formatting in `config.jsonc` survive. `Config.qml`
+watches the file, so the new picture appears without a restart.
+
+ImageMagick does the resize and is an optional dependency. Without it the
+picked file is used where it lies, so picking a picture still works, it is just
+not shrunk.
+
+This needs the xdg-desktop-portal Qt platform theme, which `launcher.sh` now
+sets when it is not already configured. Without it Qt's file dialog opens
+invisibly and the button appears to do nothing.
+
 ### Other changes
 
 - **Display name** is Notch Shell, and the launcher, desktop entry, data

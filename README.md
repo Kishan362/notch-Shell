@@ -183,7 +183,8 @@ into your session at all times. It's not bound to any dotfiles.
 - Notifications are able to show in slide animation (similar to iOS mute) while you playing video game or watching movie in full screen.
   also it can show custom app icon to show in notification, else it shows bell icon.
 
-- Your today's data usage in mini dashboard is shown by [nusgmon](https://github.com/LUCKYS1NGHH/nusgmon) (i am the creator of it too).
+- CPU usage and temperature in the mini dashboard, with a per-core breakdown on
+  click. Replaces the data-usage readout that used to sit there.
 
 - Wallpaper switcher shows you the filename of the image on hover. uses `awww` in backend to update the wallpaper by default (optional dep).
 ---
@@ -197,6 +198,22 @@ under the same GPL-3.0 licence, rebranded to **notch-shell** and developed
 independently on `main`.
 
 ### What changed
+
+**CPU stats in the mini dashboard.** Replaces the data-usage readout on the
+right. Overall utilisation and package temperature at all times; click (or
+right click) the readout for a per-core breakdown with a bar each, and the bar
+turns red past 85%. Usage is read from `/proc/stat` through a `FileView`, so a
+refresh costs one small read rather than a process spawn, and percentages are
+computed as deltas between samples. The temperature comes from `lm_sensors` and
+hides itself if that is not installed.
+
+**Click-to-pick profile picture.** Click the avatar in the mini dashboard to
+choose an image. It is downscaled to 256x256 (EXIF rotation applied, centre
+cropped so the circular avatar does not letterbox) and cached, then
+`displayPicture` is repointed at it. `scripts/set_config.py` edits that single
+key in place, so your comments and formatting survive, and the shell picks the
+change up without a restart. ImageMagick does the resize; without it the
+picked file is used where it lies, just not shrunk.
 
 **Two screen-edge notches.** A pill in the **bottom-left** corner lists every
 open window, taskbar style, grouped by app with a count badge and a dot on the
@@ -326,7 +343,7 @@ Built from source with a local PKGBUILD rather than the AUR package, so
 
 | Option | Description | Default |
 |---|---|---|
-| `displayPicture` | Profile image path for mini dashboard | *(none)* |
+| `displayPicture` | Profile image path for mini dashboard, also settable by clicking the avatar | *(none)* |
 | `clockFormat` | Clock format for the pill bar | `hh:mm` |
 | `pillTopMargin` | Top spacing of pill bar | `9` |
 | `pillBottomMargin` | Bottom spacing of pill bar | `26` |
@@ -522,7 +539,7 @@ Example `pillModules`:
 > Packages below are Arch's; find the equivalent for your distro.
 
 - [cliphist](https://github.com/sentriz/cliphist)
-- [nusgmon](https://github.com/LUCKYS1NGHH/nusgmon) (AUR package; non-Arch users can use the setup script instead)
+- [lm_sensors](https://github.com/lm-sensors/lm-sensors) (`lm_sensors` on Arch) CPU temperature for the dashboard readout
 - [inotify-tools](https://github.com/inotify-tools/inotify-tools)
 - [brightnessctl](https://github.com/Hummer12007/brightnessctl)
 - [wl-clipboard](https://github.com/bugaevc/wl-clipboard)
@@ -537,6 +554,9 @@ Example `pillModules`:
 - JetBrainsMono Nerd Font (`ttf-jetbrains-mono-nerd` on Arch)
 - `qt6-imageformats` (on Arch) more image format support (e.g. WEBP) for wallpaper previews
 - `holidays` (Python lib) event dates in calendar; `install.sh` prompts to install this one
+- **ImageMagick** (`imagemagick`) only needed to downscale a profile picture you
+  pick by clicking the avatar. Without it the picture still works, it is just
+  not resized
 - `cava` for showing audio visuals in media player
 - `awww` for wallpaper switcher if you don't use custom wallpaper script
 

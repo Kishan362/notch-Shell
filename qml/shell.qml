@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Dialogs
 import Quickshell.Widgets
 import Quickshell.Services.UPower
 import Quickshell.Services.Notifications
@@ -120,6 +121,76 @@ ShellRoot {
   }
 
   property bool pillHoverActive: false
+
+  // ---- avatar picker -------------------------------------------------------
+  // Click the profile picture to choose a new one. ImageMagick downscales it
+  // to avatarOutSize and the result is cached; then set_config.py repoints
+  // displayPicture at it, editing that single key in place so comments and
+  // formatting survive. Config.qml watches the file, so the new picture shows
+  // up without a restart.
+  //
+  // ImageMagick is a soft dependency. Without it the picked file is used
+  // where it lies, so picking a picture still works, it is just not shrunk.
+  readonly property int avatarOutSize: 256
+  readonly property string avatarCacheDir: Quickshell.env("HOME") + "/.cache/notch-shell"
+  readonly property string avatarCached: avatarCacheDir + "/avatar.png"
+  property string avatarSource: ""
+  property string avatarStatus: ""
+  property bool hasMagick: false
+
+  FileDialog {
+    id: avatarDialog
+    title: "Choose a profile picture"
+    nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)", "All files (*)"]
+    onAccepted: {
+      shellRoot.avatarSource = selectedFile.toString().replace("file://", "")
+      shellRoot.avatarStatus = "processing..."
+      if (shellRoot.hasMagick) { resizeProc.running = false; resizeProc.running = true }
+      else { setConfigProc.running = false; setConfigProc.running = true }
+    }
+  }
+
+  // probe once for ImageMagick
+  Process {
+    id: magickProbe
+    command: ["sh", "-c", "command -v magick || command -v convert"]
+    running: true
+    stdout: StdioCollector {
+      onStreamFinished: {
+        shellRoot.hasMagick = this.text.trim().length > 0
+        magickProbe.running = false
+      }
+    }
+    stderr: StdioCollector { onStreamFinished: magickProbe.running = false }
+  }
+
+  // No shell wrapper: the paths are passed as argv, so a file name with a
+  // space or a quote in it cannot break the command.
+  Process {
+    id: resizeProc
+    command: ["magick", shellRoot.avatarSource,
+              "-auto-orient",
+              "-resize", shellRoot.avatarOutSize + "x" + shellRoot.avatarOutSize + "^",
+              "-gravity", "center",
+              "-extent", shellRoot.avatarOutSize + "x" + shellRoot.avatarOutSize,
+              shellRoot.avatarCached]
+    running: false
+    onExited: exitCode => {
+      if (exitCode === 0) { setConfigProc.running = false; setConfigProc.running = true }
+      else shellRoot.avatarStatus = "could not resize that image"
+    }
+  }
+
+  // points the config at whichever copy should be used
+  Process {
+    id: setConfigProc
+    command: ["python3", "/usr/share/notch-shell/scripts/set_config.py",
+              "displayPicture", shellRoot.hasMagick ? shellRoot.avatarCached : shellRoot.avatarSource]
+    running: false
+    onExited: exitCode => {
+      shellRoot.avatarStatus = exitCode === 0 ? "profile picture updated" : "could not update the config"
+    }
+  }
 
   property string bg: Theme.bg
   property string fg: Theme.fg
@@ -955,6 +1026,26 @@ ShellRoot {
               mipmap: true
               sourceSize: Qt.size(avatarSize, avatarSize)
             }
+
+            // click to choose a different picture
+            MouseArea {
+              id: avatarMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: avatarDialog.open()
+            }
+
+            // ring shown on hover so it reads as clickable
+            Rectangle {
+              anchors.fill: parent
+              radius: avatarSize / 2
+              color: "transparent"
+              border.width: 2
+              border.color: Theme.accent
+              opacity: avatarMouse.containsMouse ? 0.9 : 0
+              Behavior on opacity { NumberAnimation { duration: 120 } }
+            }
           }
 
           // username
@@ -1046,12 +1137,16 @@ ShellRoot {
           anchors.bottomMargin: 42
         }
 
-        // data usage status
-        DataUsage {
+        // cpu usage and temperature, right side. click to expand the
+        // per-core list. replaced the data-usage block that sat here
+        CpuStats {
+          // clear the battery readout that occupies the top right, otherwise
+          // the per-core list grows straight up into it
           anchors.right: parent.right
-          anchors.rightMargin: 4
+          anchors.rightMargin: 56
           anchors.bottom: parent.bottom
-          anchors.bottomMargin: 42
+          // the module measures its own room from this, so share the value
+          anchors.bottomMargin: bottomInset
         }
 
         // rectangle where poweroff, sleep etc. buttons placed

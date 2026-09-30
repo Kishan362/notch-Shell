@@ -67,35 +67,13 @@ if [[ "$skip_arg" != "--skip-deps" ]]; then
          fi
       fi
 
-      # install nusgmon based on version update
-      if [[ ! -d /tmp/nusgmon-build ]]; then
-         if ! git clone --depth=1 https://github.com/LUCKYS1NGHH/nusgmon.git /tmp/nusgmon-build; then
-            warn "Failed to clone nusgmon repository, skipping."
-         fi
-      fi
-
-      nusgmon_install=0
-      if [[ -d /tmp/nusgmon-build ]]; then
-         if bin_exists nusgmon; then
-            [[ $(nusgmon --version) != $(/tmp/nusgmon-build/./nusgmon --version) ]] && nusgmon_install=1
-         else
-            nusgmon_install=1
-         fi
-      fi
-
-      if (( nusgmon_install )); then
-          info "Installing nusgmon (to record your data usage) through git"
-          (cd /tmp/nusgmon-build && ./setup.sh) || warn "Something wrong with nusgmon installation, try installing it manually."
-      else
-          info "nusgmon is already installed and up to date, skipping."
-      fi
   fi
 fi
 
 bin_exists awww || warn "Awww not installed. it will be needed if you don't use custom wallpaper script."
 bin_exists quickshell || die "Quickshell not installed."
 bin_exists cliphist || die "Cliphist not installed."
-bin_exists nusgmon || die "Nusgmon not installed."
+bin_exists sensors || die "lm_sensors not installed. it provides the CPU temperature."
 bin_exists inotifywait || die "Inotify not installed."
 bin_exists brightnessctl || die "Brightnessctl not installed."
 bin_exists cmake || die "Cmake not installed."
