@@ -28,7 +28,11 @@ ROOT = Path(__file__).resolve().parent.parent
 QML = ROOT / "qml"
 PALETTES = QML / "ThemePalettes.qml"
 
-THEME_FILES = {"Theme.qml", "ThemeRamp.qml", "ThemePalettes.qml"}
+THEME_FILES = {"Theme.qml", "ThemeRamp.qml", "ThemePalettes.qml",
+               # palette generators, not UI: they define colours rather
+               # than draw with them, so literal status colours and the
+               # black/white shading endpoints are the point
+               "ThemeDynamic.qml", "ThemeExternal.qml"}
 
 # Colours that are deliberately literal: decorative hues whose meaning is the
 # hue itself (a sun is yellow, a rain icon is blue) rather than a surface or

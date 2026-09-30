@@ -7,9 +7,17 @@ import Qt.labs.folderlistmodel
 
 Rectangle {
   id: wallpaperPopup
+
+  Process {
+    id: writeWallpaperProc
+    command: ["python3", "/usr/share/notch-shell/scripts/set_config.py",
+              "currentWallpaper", wallpaperPopup.appliedPath]
+    running: false
+  }
   property bool shown: false
   property string selectedWallpaper: ""
   property bool awwwMissing: false
+  property string appliedPath: ""
   property bool cwsMissing: false
   anchors.fill: parent
 
@@ -32,6 +40,10 @@ Rectangle {
 
   function applyWallpaper(path) {
     wallpaperPopup.selectedWallpaper = "file://" + path
+    wallpaperPopup.appliedPath = path
+    // remembered so the "wallpaper" theme has something to sample
+    writeWallpaperProc.running = false
+    writeWallpaperProc.running = true
     if (Config.customWallpaperScript.trim() === "") {
       Quickshell.execDetached(["awww", "img", "--transition-type", "random", path])
     }

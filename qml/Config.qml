@@ -48,6 +48,9 @@ Singleton {
       property string defaultTerminal: "kitty"
       property real pillScale: 1.0
       property real dpiScale: 1.0
+      // the wallpaper that is actually applied, written by the wallpaper
+      // switcher. the "wallpaper" theme samples this.
+      property string currentWallpaper: ""
       property string wallpapersDir: Quickshell.env("HOME") + "/Pictures/wallpapers"
       property bool wsCloseOnWallpaperSet: true
       property bool wsAnimation: true
@@ -91,6 +94,7 @@ Singleton {
   readonly property alias defaultTerminal: adapter.defaultTerminal
   readonly property alias pillScale: adapter.pillScale
   readonly property alias dpiScale: adapter.dpiScale
+  readonly property alias currentWallpaper: adapter.currentWallpaper
   readonly property alias wallpapersDir: adapter.wallpapersDir
   readonly property alias wsCloseOnWallpaperSet: adapter.wsCloseOnWallpaperSet
   readonly property alias wsAnimation: adapter.wsAnimation

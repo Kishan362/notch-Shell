@@ -1,3 +1,80 @@
+# notch-shell 0.2.0
+
+Dynamic wallpaper theming. Set `"theme": "wallpaper"` and the bar derives its
+palette from the wallpaper, refreshing whenever the wallpaper changes.
+
+## How it works
+
+Palette generation is delegated rather than reimplemented. notch-shell ships a
+wallust template that records wallust's 16-colour output verbatim, wallust
+writes it to `~/.config/notch-shell/theme-wallust.json`, and the shell watches
+that file. Turning those colours into surfaces, text and an accent stays in the
+shell, because only the shell knows what those mean for its own UI.
+
+Three tiers, first one available wins:
+
+1. **wallust**, if it is on `$PATH` — the preferred generator.
+2. **The built-in sampler**, if ImageMagick is installed.
+3. **The default grey theme**, if neither is available.
+
+Uninstalling wallust therefore drops you to the built-in sampler rather than
+leaving the bar unthemed, and the ImageMagick sampler is no longer dead code.
+
+The picker shows which generator is live (`source: wallust
+salience/saliencedark`). Dynamic theming fails silently often enough that
+naming the source is worth the pixels.
+
+## Readability is enforced, not hoped for
+
+Text is pulled 72% of the way to white — or black on a light palette — because a
+wallust foreground is tuned to be a legible *terminal* colour, which on a
+saturated wallpaper is a fully saturated hue that would tint every label. It is
+then walked away from the background until it clears 4.5:1. The accent is the
+most chromatic of the 16, corrected until it clears 3:1.
+
+Measured across five wallpapers: text 14.8–18.3:1, accent 5.1–10.9:1.
+
+Accent selection ranks on absolute channel spread rather than the usual
+`(max-min)/max` saturation ratio. The ratio scores near-black highly, because a
+colour with a zero channel looks saturated however dark it is; on a red wallpaper
+it picked `#070001` as the accent, which the contrast fix then washed out to
+grey. Spread only counts colour that is actually present.
+
+Status colours are never sampled. A red wallpaper would otherwise paint `danger`
+red and make that row invisible.
+
+## Quickshell 0.3.1 traps hit along the way
+
+Three of these cost real debugging time and are worth recording:
+
+- **A `Process` inside a `pragma Singleton` never runs.** It starts, never emits,
+  never exits. The sampler had to move into `shell.qml`.
+- **Setting `running = false` inside a stream handler kills the process
+  mid-flight.** stdout came back empty and the exit code was 15, which reads
+  like a broken command rather than a self-inflicted SIGTERM.
+- **`FileView.text` is a method in 0.3.1, not a property.** `file.text`
+  evaluates to the function object, which stringifies to
+  `function text() { [native code] }` and parses as nothing.
+
+## One bug fixed that was already committed
+
+The wallpaper sampler was wired to `Connections { onCurrentWallpaperChanged }`.
+That signal never arrives, because `Config` is a lazy singleton and the
+wallpaper can appear long after the shell starts. It only ever sampled once, on
+whatever happened to be in the config at that instant, and never refreshed
+afterwards. It is now polled against the last sampled path.
+
+## Notes
+
+- wallust is not in the Arch repositories, so it is not a package dependency.
+  The README documents installing the prebuilt static binary.
+- `wallust run` regenerates *every* template in your `wallust.toml`, not just
+  notch-shell's. That is normal wallust behaviour but it does mean changing a
+  wallpaper here also refreshes anything else you have wired to follow it.
+- `imagemagick` stays optional: the wallust path does not use it.
+
+---
+
 # notch-shell 0.1.1
 
 Two fixes to the profile picture picker introduced in 0.1.0. Everything else in

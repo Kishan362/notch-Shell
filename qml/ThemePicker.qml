@@ -15,7 +15,10 @@ Rectangle {
   visible: opacity > 0
   opacity: shown ? 1 : 0
 
-  readonly property var themes: ThemePalettes.names()
+  // "wallpaper" leads the list: it is not in the table, it is generated from
+  // the current wallpaper. Listed first because it is the one that changes
+  // without you touching anything.
+  readonly property var themes: [ThemeDynamic.themeName].concat(ThemePalettes.names())
 
   // Widen the grid as the palette set grows so a large set stays browsable.
   readonly property int columns: themes.length > 30 ? 4 : (themes.length > 16 ? 3 : 2)
@@ -76,6 +79,19 @@ Rectangle {
         font.pixelSize: Math.round(Theme.fontSize * 0.8)
       }
 
+      // Says which generator is actually live while the wallpaper theme is
+      // selected. Dynamic theming fails silently far too often: the wallpaper
+      // changes, the colours do not, and nothing tells you why. Naming the
+      // source turns that into something you can see and act on.
+      Text {
+        visible: picker.current === ThemeDynamic.themeName
+        text: "source: " + ThemeDynamic.source
+              + (ThemeDynamic.source === "unavailable" ? " - set a wallpaper once" : "")
+        color: ThemeDynamic.source === "unavailable" ? Theme.dangerFg : Theme.fg5
+        font.family: Theme.fontFamily
+        font.pixelSize: Math.round(Theme.fontSize * 0.8)
+      }
+
       Item { Layout.fillWidth: true }
     }
 
@@ -100,7 +116,10 @@ Rectangle {
             required property string modelData
             required property int index
 
-            readonly property var entry: ThemePalettes.get(modelData)
+            // the wallpaper theme is generated, not tabulated
+            readonly property var entry: modelData === ThemeDynamic.themeName
+              ? (ThemeDynamic.entry || ThemePalettes.get("default"))
+              : ThemePalettes.get(modelData)
             readonly property bool active: modelData === picker.current
 
             Layout.fillWidth: true

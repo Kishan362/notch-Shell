@@ -472,6 +472,72 @@ existing block, give it a new key, and set its `label` and `light` fields.
 `scripts/validate_themes.py` replicates the derivation in Python and checks every
 palette for contrast and ramp consistency; run it after adding a theme.
 
+### Dynamic wallpaper themes
+
+Set `"theme": "wallpaper"` and the bar takes its palette from the wallpaper
+instead of a fixed table. It refreshes whenever you change wallpaper, including
+from outside the bar.
+
+```
+python3 /usr/share/notch-shell/scripts/set_config.py theme wallpaper
+```
+
+The theme picker names the generator that is actually live (`source: wallust
+salience/saliencedark`) so a palette that failed to update is visible rather
+than silent.
+
+**Palette generation is delegated, with a fallback.** There are three tiers, and
+the first one available wins:
+
+| Tier | Needs | Produces |
+| --- | --- | --- |
+| [wallust](https://codeberg.org/explosion-mental/wallust) | `wallust` on `$PATH` | full 16-colour palette from its `salience` colourspace |
+| Built-in sampler | `imagemagick` | dominant-colour palette sampled from the image |
+| Default | nothing | the stock grey theme |
+
+So removing wallust does not leave the bar unthemed — it drops to the built-in
+sampler, and removing that too drops to `default`.
+
+wallust is not in the Arch repositories, so it is not a package dependency.
+Install the prebuilt static binary if you want the preferred tier:
+
+```
+V=3.5.2
+curl -fsSLO "https://codeberg.org/explosion-mental/wallust/releases/download/$V/wallust-$V-x86_64-unknown-linux-musl.tar.gz"
+sudo tar -xzf "wallust-$V-x86_64-unknown-linux-musl.tar.gz" -C /usr/local/bin wallust
+wallust --version
+```
+
+The installer registers `templates/notch-shell.json` with wallust and points it
+at `~/.config/notch-shell/theme-wallust.json`, which the shell watches. Both
+steps are idempotent and neither overwrites an existing file of yours. To do it
+by hand later:
+
+```
+python3 /usr/share/notch-shell/scripts/setup_wallust.py
+```
+
+Two things worth knowing:
+
+- The template only records wallust's output verbatim. Turning that into
+  surfaces, text and an accent is the shell's job, because only the shell knows
+  what those mean for its own UI. Text is pulled most of the way to white (or
+  black on a light palette) and then pushed away from the background until it
+  clears 4.5:1; the accent is the most chromatic of the 16 and is corrected to
+  clear 3:1.
+- Status colours (`warning`, `danger`, `ok`, `info`) are never taken from the
+  wallpaper. A red wallpaper would otherwise paint "danger" red and make the
+  row invisible.
+
+**Caveat:** `wallust run` regenerates *every* template configured in your
+`wallust.toml`, not just notch-shell's. That is normal wallust behaviour, but it
+does mean picking a wallpaper here will also refresh anything else you have set
+up to follow it.
+
+The shell runs `wallust run` on every wallpaper change. If you change wallpaper
+outside the bar, the shell notices the mismatch between `currentWallpaper` and
+the wallpaper wallust last sampled and re-runs it.
+
 ### Changing the weather location
 
 Click the city name in the weather popup to open the location picker. Type to

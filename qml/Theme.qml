@@ -10,7 +10,12 @@ import QtQuick
 Singleton {
     id: root
 
-    readonly property var entry: ThemePalettes.get(Config.theme)
+    // "wallpaper" is not in the table: it is generated from the current
+    // wallpaper on demand. Everything downstream is unchanged, because
+    // ThemeDynamic.entry has the same shape a table entry has.
+    readonly property var entry: Config.theme === ThemeDynamic.themeName
+        ? (ThemeDynamic.entry || ThemePalettes.get("default"))
+        : ThemePalettes.get(Config.theme)
     readonly property string name: Config.theme
     readonly property var p: ThemeRamp.build(entry.palette, entry.literal)
 

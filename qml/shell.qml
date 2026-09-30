@@ -122,6 +122,72 @@ ShellRoot {
 
   property bool pillHoverActive: false
 
+  // ---- wallpaper theme sampler ---------------------------------------------
+  // The Processes live here rather than in the ThemeDynamic singleton because a
+  // Process parented to a `pragma Singleton` never runs under quickshell 0.3.1.
+  //
+  // wallust does the palette work: `wallust run` regenerates the theme file
+  // from templates/notch-shell.json and ThemeExternal picks the result up
+  // through its FileView. If wallust is missing or fails for any reason, the
+  // non-zero exit drops through to the built-in ImageMagick sampler below, so
+  // the theme keeps working with only one dependency.
+  property string lastSampledWallpaper: ""
+
+  Process {
+    id: wallustRun
+    running: false
+    // -s skips terminal sequences: this shell only themes the bar, and
+    // repainting every open terminal as a side effect would be surprising.
+    command: ["sh", "-c", "wallust run \"$1\" -s -q", "sh", Config.currentWallpaper]
+    onExited: (code) => {
+      // 127 is "not found". Anything non-zero means we got no usable palette,
+      // so fall back rather than leaving the bar on the last good theme.
+      if (code !== 0) builtinSample.running = true
+    }
+  }
+
+  Process {
+    id: builtinSample
+    running: false
+    command: ["sh", "-c",
+      "magick \"$1\" -resize 160x160 -colors 8 -depth 8 -format %c histogram:info:",
+      "sh", ThemeDynamic.currentWallpaper]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const out = []
+        for (const line of this.text.split("\\n")) {
+          const m = line.match(/(#[0-9A-Fa-f]{6,8})/)
+          if (m) out.push(m[1].slice(0, 7).toUpperCase())
+        }
+        ThemeDynamic.finishSample(out)
+      }
+    }
+    stderr: StdioCollector {
+      onStreamFinished: {
+        if (ThemeDynamic.sampling) ThemeDynamic.failSample("could not sample that image")
+      }
+    }
+  }
+
+  function refreshWallpaperTheme() {
+    const wp = Config.currentWallpaper
+    if (!wp || wp === shellRoot.lastSampledWallpaper) return
+    shellRoot.lastSampledWallpaper = wp
+    if (!ThemeDynamic.beginSample()) return
+    wallustRun.running = true
+  }
+
+  // Polling rather than Connections { onCurrentWallpaperChanged }: Config is a
+  // lazy singleton, so the wallpaper can appear long after this shell started
+  // and the change signal never reaches us. The signal version only ever
+  // sampled once, on whatever happened to be in config at that instant.
+  Timer {
+    interval: 1500
+    running: true
+    repeat: true
+    onTriggered: shellRoot.refreshWallpaperTheme()
+  }
+
   // ---- avatar picker -------------------------------------------------------
   // Click the profile picture to choose a new one. ImageMagick downscales it
   // to avatarOutSize and the result is cached; then set_config.py repoints

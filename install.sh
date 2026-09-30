@@ -156,6 +156,7 @@ fi
 info "Copying scripts and share directory to /usr/share/notch-shell"
 cp -r scripts /usr/share/notch-shell
 cp -r share /usr/share/notch-shell
+cp -r templates /usr/share/notch-shell
 
 # copy QML files
 info "Copying QML files"
@@ -209,6 +210,13 @@ info "Few adjustments"
 if [[ -f /usr/share/notch-shell/scripts/cpu-temp.sh ]]; then
    mv /usr/share/notch-shell/scripts/cpu-temp.sh "$REAL_HOME/.config/notch-shell/modules/cpu-temp.sh"
    chown -R "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$REAL_HOME/.config/notch-shell/modules/cpu-temp.sh"
+fi
+
+# point wallust at notch-shell's theme template, if wallust is installed
+if bin_exists wallust && [[ -f scripts/setup_wallust.py ]]; then
+   info "Setting up wallust dynamic theming"
+   sudo -u "$SUDO_USER" HOME="$REAL_HOME" python3 scripts/setup_wallust.py \
+      || warn "wallust setup failed. The built-in sampler will be used instead."
 fi
 
 # cleaning build files
