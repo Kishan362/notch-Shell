@@ -98,6 +98,13 @@ repointed at the cached copy by `scripts/set_config.py`, which edits that one
 key in place, so comments and formatting in `config.jsonc` survive. `Config.qml`
 watches the file, so the new picture appears without a restart.
 
+That script rewrites the config rather than swapping it via a temp file and
+rename. `Config.qml` watches the path with a `FileView`, which is an inotify
+watch on the inode behind it, and `os.replace()` moves that watch onto the old,
+now-deleted file. The first change reached the shell and every later one was
+silently ignored, so a newly picked picture only appeared after a restart. The
+write is now in place, and a `config.jsonc.bak` is left behind each time.
+
 ImageMagick does the resize and is an optional dependency. Without it the
 picked file is used where it lies, so picking a picture still works, it is just
 not shrunk.

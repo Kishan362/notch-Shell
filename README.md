@@ -212,8 +212,11 @@ choose an image. It is downscaled to 256x256 (EXIF rotation applied, centre
 cropped so the circular avatar does not letterbox) and cached, then
 `displayPicture` is repointed at it. `scripts/set_config.py` edits that single
 key in place, so your comments and formatting survive, and the shell picks the
-change up without a restart. ImageMagick does the resize; without it the
-picked file is used where it lies, just not shrunk.
+change up without a restart. The script rewrites the file rather than replacing
+it, because `Config.qml` watches the path and a rename would move that watch
+onto a deleted inode; it also leaves a `config.jsonc.bak` beside your config.
+ImageMagick does the resize; without it the picked file is used where it lies,
+just not shrunk.
 
 **Two screen-edge notches.** A pill in the **bottom-left** corner lists every
 open window, taskbar style, grouped by app with a count badge and a dot on the

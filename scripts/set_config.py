@@ -20,7 +20,6 @@ import json
 import os
 import re
 import sys
-import tempfile
 
 CONFIG = os.path.expanduser("~/.config/notch-shell/config.jsonc")
 
@@ -105,18 +104,34 @@ def main() -> int:
         print("already set: " + ", ".join(f"{k}={v!r}" for k, v in pairs))
         return 0
 
-    # write via a temp file in the same dir, then rename, so a crash mid-write
-    # cannot leave a truncated config behind
-    directory = os.path.dirname(CONFIG)
-    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".config.jsonc.")
+    # Write in place rather than via a temp file and rename.
+    #
+    # os.replace() swaps the inode, and Config.qml watches the config with a
+    # FileView, which is an inotify watch on the path. That watch follows the
+    # inode, so after the first rename it is pointed at a deleted file and never
+    # fires again: the first change reaches the shell and every one after it is
+    # silently ignored, so a new profile picture only appears after a restart.
+    # Truncating and rewriting keeps the same inode, so the watch survives.
+    #
+    # The new text is fully computed before anything is written, and a backup of
+    # the previous contents is taken first, so a crash mid-write is recoverable
+    # even though the write is no longer atomic.
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with open(CONFIG + ".bak", "w", encoding="utf-8") as f:
+            f.write(text)
+        with open(CONFIG, "w", encoding="utf-8") as f:
             f.write(new)
-        os.chmod(tmp, os.stat(CONFIG).st_mode & 0o7777)
-        os.replace(tmp, CONFIG)
+            f.flush()
+            os.fsync(f.fileno())
     except Exception:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        # put the original back if the write did not get far
+        if os.path.exists(CONFIG + ".bak"):
+            try:
+                with open(CONFIG + ".bak", encoding="utf-8") as src, \
+                     open(CONFIG, "w", encoding="utf-8") as dst:
+                    dst.write(src.read())
+            except OSError:
+                pass
         raise
 
     print("set: " + ", ".join(f"{k}={v!r}" for k, v in pairs))
