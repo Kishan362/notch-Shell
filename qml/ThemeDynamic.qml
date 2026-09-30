@@ -46,8 +46,12 @@ Singleton {
     // The sampler lives in shell.qml, not here: a Process parented to a
     // `pragma Singleton` never runs under quickshell 0.3.1, so the shell owns
     // the process and pushes the result in through these calls.
-    function beginSample() {
-        if (!root.currentWallpaper) {
+    // `path` is passed in rather than read from Config because the wallpaper
+    // that is actually on screen comes from awww, which may name a file the
+    // config has never recorded.
+    function beginSample(path) {
+        const wp = path || root.currentWallpaper
+        if (!wp) {
             root.sampled = []
             root.sampling = false
             return false
@@ -61,6 +65,13 @@ Singleton {
         root.sampled = hexes
         root.sampling = false
         root.samplerError = hexes.length ? "" : "could not read that image"
+    }
+
+    // wallust writes the palette to a file rather than handing it back, so on
+    // that path neither finishSample nor failSample is ever reached and the
+    // sampling flag would stay true forever, blocking every later refresh.
+    function endSample() {
+        root.sampling = false
     }
 
     function failSample(why) {

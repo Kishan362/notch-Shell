@@ -534,9 +534,23 @@ Two things worth knowing:
 does mean picking a wallpaper here will also refresh anything else you have set
 up to follow it.
 
-The shell runs `wallust run` on every wallpaper change. If you change wallpaper
-outside the bar, the shell notices the mismatch between `currentWallpaper` and
-the wallpaper wallust last sampled and re-runs it.
+### Following wallpaper changes made anywhere
+
+The theme follows the wallpaper **however you change it** — through the bar, a
+keybind, a script, or a typed `awww img`.
+
+It does this by asking `awww query` what is actually on screen rather than
+trusting the config. `currentWallpaper` is only written by notch-shell's own
+switcher, so relying on it means a wallpaper changed any other way leaves the
+theme showing the old palette. Polling awww costs about 2ms per query.
+
+If `awww` is not installed, or its daemon is not running, the shell falls back to
+`currentWallpaper`, so the switcher keeps working exactly as before. A monitor
+showing a solid colour is skipped, and if no monitor shows an image the theme is
+left alone rather than blanked.
+
+`currentWallpaper` is still written by the switcher, and is still what the
+fallback uses.
 
 ### Changing the weather location
 

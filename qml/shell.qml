@@ -132,14 +132,50 @@ ShellRoot {
   // non-zero exit drops through to the built-in ImageMagick sampler below, so
   // the theme keeps working with only one dependency.
   property string lastSampledWallpaper: ""
+  // what awww says is on screen right now, which is not always what
+  // Config.currentWallpaper records - see parseWallpaperQuery
+  property string liveWallpaper: ""
+  // the path a run in flight is sampling. Held separately from activeWallpaper
+  // so the command binding cannot change underneath a running process.
+  property string pendingSample: ""
+
+  // awww is the source of truth when it is available: it knows what is actually
+  // displayed, which the config does not. It only records what was last picked
+  // through notch-shell's own switcher, so a keybind, a script or a typed
+  // `awww img` leaves it stale and the theme would never follow.
+  readonly property string activeWallpaper: liveWallpaper || Config.currentWallpaper
+
+  Process {
+    id: wallpaperProbe
+    running: false
+    command: ["awww", "query"]
+    stdout: StdioCollector {
+      onStreamFinished: shellRoot.parseWallpaperQuery(this.text)
+    }
+  }
+
+  // One line per output, e.g.
+  //   : eDP-1: 1920x1080, scale: 1, currently displaying: image: /path/wall.png
+  // An output showing a solid colour has no "image:" and is skipped. If no
+  // output shows an image there is nothing to sample, so liveWallpaper is
+  // cleared and the caller falls back to the recorded config value rather than
+  // blanking the theme.
+  function parseWallpaperQuery(out) {
+    const m = String(out).match(/image:\s*(.+?)\s*$/m)
+    shellRoot.liveWallpaper = m ? m[1].trim() : ""
+    shellRoot.refreshWallpaperTheme()
+  }
 
   Process {
     id: wallustRun
     running: false
     // -s skips terminal sequences: this shell only themes the bar, and
     // repainting every open terminal as a side effect would be surprising.
-    command: ["sh", "-c", "wallust run \"$1\" -s -q", "sh", Config.currentWallpaper]
+    command: ["sh", "-c", "wallust run \"$1\" -s -q", "sh", shellRoot.pendingSample]
     onExited: (code) => {
+      // always clear first: the built-in sampler path clears it too, but only
+      // once its process finishes, and the poll must not stay blocked until then
+      ThemeDynamic.endSample()
       // 127 is "not found". Anything non-zero means we got no usable palette,
       // so fall back rather than leaving the bar on the last good theme.
       if (code !== 0) builtinSample.running = true
@@ -151,7 +187,7 @@ ShellRoot {
     running: false
     command: ["sh", "-c",
       "magick \"$1\" -resize 160x160 -colors 8 -depth 8 -format %c histogram:info:",
-      "sh", ThemeDynamic.currentWallpaper]
+      "sh", shellRoot.pendingSample]
     stdout: StdioCollector {
       onStreamFinished: {
         const out = []
@@ -170,10 +206,12 @@ ShellRoot {
   }
 
   function refreshWallpaperTheme() {
-    const wp = Config.currentWallpaper
+    const wp = shellRoot.activeWallpaper
     if (!wp || wp === shellRoot.lastSampledWallpaper) return
+    if (ThemeDynamic.sampling) return
     shellRoot.lastSampledWallpaper = wp
-    if (!ThemeDynamic.beginSample()) return
+    shellRoot.pendingSample = wp
+    if (!ThemeDynamic.beginSample(wp)) return
     wallustRun.running = true
   }
 
@@ -185,7 +223,15 @@ ShellRoot {
     interval: 1500
     running: true
     repeat: true
-    onTriggered: shellRoot.refreshWallpaperTheme()
+    onTriggered: {
+      // Probe and refresh both run every tick. The refresh here covers awww
+      // being absent, where the probe produces nothing and never calls back;
+      // the one inside parseWallpaperQuery covers the normal path, once the
+      // answer has actually arrived. The lastSampledWallpaper guard makes the
+      // duplicate call a no-op.
+      wallpaperProbe.running = true
+      shellRoot.refreshWallpaperTheme()
+    }
   }
 
   // ---- avatar picker -------------------------------------------------------

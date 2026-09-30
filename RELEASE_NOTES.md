@@ -1,3 +1,46 @@
+# notch-shell 0.2.1
+
+Fixes dynamic theming so it follows the wallpaper however you change it.
+
+## The theme only followed changes made inside the bar
+
+`refreshWallpaperTheme()` keyed off `currentWallpaper`, and the only thing that
+writes that key is notch-shell's own wallpaper switcher. Changing wallpaper by
+any other route — a keybind running `awww`, a script, a typed `awww img`, a
+file manager action — updated the desktop and left the theme showing the old
+palette, with nothing to indicate anything had gone wrong.
+
+The shell now asks `awww query` what is actually on screen and treats that as
+the source of truth, falling back to `currentWallpaper` when awww is absent or
+its daemon is down. The fallback keeps the switcher working unchanged for anyone
+not using awww.
+
+Verified end to end with the config deliberately pointing at the wrong image:
+the probe overrode it, and a wallpaper change made from outside the shell was
+followed within one poll interval.
+
+## Two bugs found while building it
+
+**The `awww query` parser needed the multiline flag.** `awww` prints one line per
+output, and without `/m` the pattern failed to match when the image was on the
+first line, and picked the *last* image rather than the first when several
+monitors showed different ones. Caught by testing the regex against seven
+synthetic outputs rather than only the single-monitor case that happens to be
+this machine.
+
+**A sampling flag deadlocked the refresh path.** The guard against overlapping
+runs checked `ThemeDynamic.sampling`, which `beginSample()` sets true. On the
+wallust path nothing ever cleared it: wallust writes the palette to a file that
+`ThemeExternal` reads, so neither `finishSample()` nor `failSample()` is reached.
+The flag stayed true and every subsequent wallpaper change was refused. Added
+`endSample()` and call it when wallust exits.
+
+That second one is worth dwelling on, because the symptom was the feature
+appearing not to work at all while the visible cause — a wallpaper changed
+outside the bar — was a separate, already-fixed problem.
+
+---
+
 # notch-shell 0.2.0
 
 Dynamic wallpaper theming. Set `"theme": "wallpaper"` and the bar derives its
